@@ -1,0 +1,42 @@
+<!--
+  单目标点到达后等待 3 秒的 Behavior Tree。
+
+  使用场景：
+  1. 作为多段导航的第一段 BT。
+  2. 机器人到达中间目标点后，不立刻执行下一段任务。
+  3. 等待 3 秒后，当前 NavigateToPose action 才返回成功。
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="4" name="NavigateWaitRecovery">
+      <PipelineSequence name="NavigateWithWait">
+        <!-- 每 1 秒重新规划一次全局路径。 -->
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+            <ClearEntireCostmap name="ClearGlobalCostmapContext" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <!-- 跟踪路径，到达目标点后返回 SUCCESS。 -->
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmapContext" service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+        <!-- 中间点停留 3 秒。 -->
+        <Wait wait_duration="3"/>
+      </PipelineSequence>
+      <ReactiveFallback name="NavigateWaitRecoveryFallback">
+        <GoalUpdated/>
+        <RoundRobin name="NavigateWaitRecoveryActions">
+          <Sequence name="ClearBothCostmaps">
+            <ClearEntireCostmap name="ClearLocalCostmapSubtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmapSubtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+          <Spin spin_dist="1.57"/>
+          <Wait wait_duration="2"/>
+          <BackUp backup_dist="0.20" backup_speed="0.05"/>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

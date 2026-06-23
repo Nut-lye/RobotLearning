@@ -1,0 +1,81 @@
+<!--
+  多目标点 Behavior Tree 演示。
+
+  本 XML 只描述“如何执行导航任务”：
+  1. 接收 NavigateThroughPoses action 传入的 goals。
+  2. 根据 goals 计算一条经过多个目标点的全局路径。
+  3. 控制机器人沿路径运动。
+  4. 规划或控制失败时执行清理代价地图、旋转、等待、后退等恢复行为。
+
+  不同路段的速度由 send_bt_waypoints.py 在运行时修改 Nav2 参数实现。
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <!--
+      RecoveryNode 表示带恢复能力的导航流程。
+      主流程失败后，最多执行 4 次恢复尝试。
+    -->
+    <RecoveryNode number_of_retries="4" name="DemoWaypointsRecovery">
+      <!--
+        PipelineSequence 用于并行推进“规划”和“跟踪”两个阶段。
+        上游路径更新后，下游 FollowPath 会继续跟踪新路径。
+      -->
+      <PipelineSequence name="DemoWaypointsWithReplanning">
+        <!--
+          RateController 控制全局路径重规划频率。
+          hz="0.5" 表示每 2 秒最多重新规划一次。
+        -->
+        <RateController hz="0.5">
+          <!--
+            ComputePathThroughPoses 阶段失败时，先清理全局代价地图再重试。
+          -->
+          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
+            <ReactiveSequence>
+              <!--
+                RemovePassedGoals 会从 goals 中移除已经到达的目标点。
+                radius="0.5" 表示距离目标点 0.5 米内视为通过。
+              -->
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.5"/>
+              <!--
+                ComputePathThroughPoses 调用全局规划器 GridBased。
+                输出路径保存到黑板变量 path。
+              -->
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+            </ReactiveSequence>
+            <!-- 全局规划失败时清理 global_costmap。 -->
+            <ClearEntireCostmap name="ClearGlobalCostmapContext" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+        <!--
+          FollowPath 调用局部控制器 FollowPath。
+          控制失败时清理 local_costmap 后重试。
+        -->
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath"/>
+          <ClearEntireCostmap name="ClearLocalCostmapContext" service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+      </PipelineSequence>
+      <!--
+        主导航流程失败后进入恢复分支。
+        GoalUpdated 用于在目标更新时中断当前恢复动作。
+      -->
+      <ReactiveFallback name="DemoWaypointsRecoveryFallback">
+        <GoalUpdated/>
+        <!-- RoundRobin 按顺序轮流执行恢复动作。 -->
+        <RoundRobin name="DemoWaypointsRecoveryActions">
+          <!-- 同时清理局部和全局代价地图。 -->
+          <Sequence name="ClearBothCostmaps">
+            <ClearEntireCostmap name="ClearLocalCostmapSubtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap name="ClearGlobalCostmapSubtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+          <!-- 原地旋转 1.57 弧度。 -->
+          <Spin spin_dist="1.57"/>
+          <!-- 等待 2 秒。 -->
+          <Wait wait_duration="2"/>
+          <!-- 后退 0.20 米，速度 0.05 m/s。 -->
+          <BackUp backup_dist="0.20" backup_speed="0.05"/>
+        </RoundRobin>
+      </ReactiveFallback>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

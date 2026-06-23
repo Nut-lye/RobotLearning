@@ -421,7 +421,109 @@ ros2 launch module_c_nav_teaching 03_slam_mapping.launch.py
 ros2 run nav2_map_server map_saver_cli -f ~/ros2_ws/src/module_c_nav_teaching/maps/my_slam_map
 ```
 
-## 13. 进程清理
+## 13. Behavior Tree 演示
+
+功能包：
+
+```text
+module_c_bt_demo
+```
+
+文件结构：
+
+```text
+module_c_bt_demo/
+├── behavior_trees/module_c_demo_replanning.xml
+├── behavior_trees/module_c_demo_waypoints.xml
+├── launch/send_bt_goal.launch.py
+├── launch/send_bt_waypoints.launch.py
+├── module_c_bt_demo/send_bt_goal.py
+└── module_c_bt_demo/send_bt_waypoints.py
+```
+
+构建：
+
+```bash
+cd ~/ros2_ws
+source ~/.bashrc
+colcon build --symlink-install --packages-select module_c_bt_demo
+source install/setup.bash
+```
+
+启动条件：
+
+```text
+Gazebo 已启动
+Nav2 已启动
+/initialpose 已发布
+map -> odom 已生成
+```
+
+发送 Behavior Tree 导航目标：
+
+```bash
+ros2 launch module_c_bt_demo send_bt_goal.launch.py x:=3.0 y:=2.0 yaw:=0.0
+```
+
+切换目标点：
+
+```bash
+ros2 launch module_c_bt_demo send_bt_goal.launch.py x:=-3.0 y:=2.0 yaw:=0.0
+```
+
+发送多目标点 Behavior Tree 导航目标：
+
+```bash
+ros2 launch module_c_bt_demo send_bt_waypoints.launch.py waypoint1:=1.5,1.8,0.0 waypoint2:=3.0,2.0,0.0
+```
+
+多目标点格式：
+
+```text
+waypoint1:=x,y,yaw
+waypoint2:=x,y,yaw
+```
+
+执行顺序：
+
+```text
+先到 waypoint1
+再到 waypoint2
+```
+
+查看 Behavior Tree XML：
+
+```bash
+sed -n '1,120p' ~/ros2_ws/src/module_c_bt_demo/behavior_trees/module_c_demo_replanning.xml
+sed -n '1,120p' ~/ros2_ws/src/module_c_bt_demo/behavior_trees/module_c_demo_waypoints.xml
+```
+
+运行效果：
+
+```text
+终端输出 action feedback
+RViz 显示全局路径
+机器人按 Behavior Tree 执行路径规划、路径跟踪和恢复行为
+```
+
+反馈字段：
+
+```text
+distance_remaining
+number_of_recoveries
+number_of_poses_remaining
+```
+
+RViz 显示项：
+
+```text
+Path
+Global Costmap
+Local Costmap
+RobotModel
+```
+
+## 14. 进程清理
 
 ```bash
 pkill -9 gzserver gzclient rviz2 component_container_isolated robot_state_publisher
@@ -429,7 +531,7 @@ ros2 daemon stop
 ros2 daemon start
 ```
 
-## 14. 常见检查
+## 15. 常见检查
 
 检查话题：
 

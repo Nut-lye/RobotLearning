@@ -60,6 +60,21 @@ python3 src/moduleB/g1_action_interface.py --iface eth0 --actions "start,clap,re
 
 常用动作可直接写中文：`鼓掌`、`击掌`、`拥抱`、`比心`、`举手`、`挥手`、`握手`、`飞吻`、`坐下`、`前进`、`左转`、`停止`。
 
+如果希望执行 `minimal_g1_action.py` 时在 RViz2 中同步看到真机姿态，可先启动 G1 状态镜像窗口：
+
+```bash
+cd /home/a24/project/RobotLearning
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch ros2_g1_rviz display.launch.py use_demo:=false use_sdk2_lowstate:=true iface:=eth0
+```
+
+然后另开终端执行真机动作：
+
+```bash
+python3 src/moduleB/minimal_g1_action.py --iface eth0 --action-id 17 --release
+```
+
 ## 4. 官方 G1 MuJoCo 仿真
 
 Unitree 官方提供 `unitree_mujoco`，包含 G1 的 MuJoCo MJCF 模型和 DDS 桥接。它主要支持 `LowCmd`、`LowState`、`SportModeState`、G1 胸部 IMU 等底层仿真消息，适合做低层控制、策略部署和 sim-to-real 验证。
